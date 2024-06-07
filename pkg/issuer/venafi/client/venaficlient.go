@@ -95,7 +95,8 @@ func New(namespace string, secretsLister internalinformers.SecretLister, issuer 
 		return nil, err
 	}
 
-	vcertClient, err := vcert.NewClient(cfg)
+	// Don't authenticate
+	vcertClient, err := vcert.NewClient(cfg, false)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Venafi client: %s", err.Error())
 	}
@@ -118,14 +119,18 @@ func New(namespace string, secretsLister internalinformers.SecretLister, issuer 
 
 	instrumentedVCertClient := newInstumentedConnector(vcertClient, metrics, logger)
 
-	return &Venafi{
+	v := &Venafi{
 		namespace:     namespace,
 		secretsLister: secretsLister,
 		vcertClient:   instrumentedVCertClient,
 		cloudClient:   cc,
 		tppClient:     tppc,
 		config:        cfg,
-	}, nil
+	}
+	if err := v.VerifyCredentials(); err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 // configForIssuer will convert a cert-manager Venafi issuer into a vcert.Config
